@@ -7,7 +7,6 @@ import {
   type Sale,
 } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
-import { getWeatherForDate } from "@/lib/weather";
 
 export type SaleApiRecord = {
   id: number;
@@ -53,7 +52,6 @@ export async function createSaleRecord(data: Record<string, unknown>) {
   const date = requireDate(data.input_date);
   const amount = requireAmount(data.amount);
   const paymentType = requirePaymentType(data.payment_type);
-  const weather = await getWeatherForDate(date);
   const createdAt = typeof data.created_at === "string" ? data.created_at : new Date().toISOString();
   const syncStatus = Number.isInteger(data.sync_status) ? Number(data.sync_status) : 0;
 
@@ -61,8 +59,6 @@ export async function createSaleRecord(data: Record<string, unknown>) {
     date,
     amount,
     paymentType,
-    weather: weather.label,
-    temperature: weather.temperature,
     createdAt,
     syncStatus,
   });
