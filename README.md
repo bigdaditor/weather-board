@@ -16,9 +16,26 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Backend API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The sales, weather, and statistics backend runs in Next.js Route Handlers and
+shares the same SQLite database as the dashboard. Data is stored in
+`.data/weather-board.db`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET, POST, PATCH, DELETE | `/api/sale` | Sales CRUD and paginated daily totals |
+| GET | `/api/sale/{saleId}` | Sale lookup by ID |
+| GET | `/api/sale/month?key=YYYY-MM` | Monthly daily totals |
+| GET, POST | `/api/weather` | Monthly weather lookup and KMA weather sync |
+| GET | `/api/statistics` | Weekly and monthly statistics |
+| GET | `/api/statistics/summary/{periodType}` | Statistics summary |
+| GET | `/api/statistics/daily` | Daily sales by payment type |
+| GET | `/api/statistics/weather/monthly` | Monthly weather-sales trends |
+| POST | `/api/statistics/recompute` | Validate statistics recomputation |
+
+Set `KMA_SERVICE_KEY` in `.env.local` to enable `POST /api/weather`. Sale
+creation uses Open-Meteo to attach weather information automatically.
 
 ## Learn More
 
