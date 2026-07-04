@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   try {
     const month = new URL(request.url).searchParams.get("month");
     if (!month) throw new ApiError(400, "month query parameter is required");
-    return Response.json(readWeatherByMonth(month).map(toWeatherApiRecord));
+    return Response.json((await readWeatherByMonth(month)).map(toWeatherApiRecord));
   } catch (error) {
     return errorResponse(error);
   }

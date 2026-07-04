@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ saleId: string }> },
 ) {
   try {
-    return Response.json(getSaleRecord(Number((await params).saleId)));
+    return Response.json(await getSaleRecord(Number((await params).saleId)));
   } catch (error) {
     return errorResponse(error);
   }

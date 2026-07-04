@@ -11,8 +11,8 @@ const weatherIcon: Record<string, string> = {
   눈: "눈",
 };
 
-export default function SalesPage() {
-  const sales = getSales();
+export default async function SalesPage() {
+  const sales = await getSales();
   const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
   const paymentTypes = ["카드", "현금", "지역상품권"];
   const paymentTotals = Object.fromEntries(

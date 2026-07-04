@@ -44,7 +44,7 @@ function monthRange(value: string): [string, string] {
   return [formatDate(first), formatDate(last)];
 }
 
-function computeStatistics() {
+async function computeStatistics() {
   const buckets = new Map<string, {
     periodType: PeriodType;
     start: string;
@@ -62,7 +62,7 @@ function computeStatistics() {
     buckets.set(key, bucket);
   }
 
-  for (const sale of getSales()) {
+  for (const sale of await getSales()) {
     for (const [periodType, range] of [["week", weekRange(sale.date)], ["month", monthRange(sale.date)]] as const) {
       add(periodType, range[0], range[1], "all", sale.amount);
       add(periodType, range[0], range[1], sale.paymentType, sale.amount);
@@ -83,7 +83,7 @@ function computeStatistics() {
   })).sort((a, b) => a.period_start.localeCompare(b.period_start));
 }
 
-export function getStatistics(filters: {
+export async function getStatistics(filters: {
   periodType?: string | null;
   paymentType?: string | null;
   startDate?: string | null;
@@ -92,7 +92,7 @@ export function getStatistics(filters: {
   if (filters.periodType && !["week", "month"].includes(filters.periodType)) {
     throw new ApiError(422, "period_type must be week or month");
   }
-  return computeStatistics().filter((item) =>
+  return (await computeStatistics()).filter((item) =>
     (!filters.periodType || item.period_type === filters.periodType)
     && (!filters.paymentType || item.payment_type === filters.paymentType)
     && (!filters.startDate || item.period_start >= filters.startDate)
@@ -100,9 +100,9 @@ export function getStatistics(filters: {
   );
 }
 
-export function getDailySalesStatistics(startDate?: string | null, endDate?: string | null) {
+export async function getDailySalesStatistics(startDate?: string | null, endDate?: string | null) {
   const daily = new Map<string, Record<string, number>>();
-  for (const sale of [...getSales()].reverse()) {
+  for (const sale of [...await getSales()].reverse()) {
     if ((startDate && sale.date < startDate) || (endDate && sale.date > endDate)) continue;
     const paymentTypes = daily.get(sale.date) ?? {};
     paymentTypes[sale.paymentType] = (paymentTypes[sale.paymentType] ?? 0) + sale.amount;
@@ -120,7 +120,7 @@ function groupedSummary(summary: string, groupBy: "sky" | "rain") {
   return groupBy === "sky" ? parts[0] : (parts[1] ?? parts[0]);
 }
 
-export function getWeatherMonthlySalesTrend(filters: {
+export async function getWeatherMonthlySalesTrend(filters: {
   summary?: string | null;
   summarySky?: string | null;
   summaryRain?: string | null;
@@ -129,8 +129,9 @@ export function getWeatherMonthlySalesTrend(filters: {
   if (filters.groupBy && !["sky", "rain", "both"].includes(filters.groupBy)) {
     throw new ApiError(422, "group_by must be sky, rain, or both");
   }
-  const weatherByDate = new Map(getAllWeather().map((weather) => [weather.date, weather.summary]));
-  for (const sale of getSales()) {
+  const sales = await getSales();
+  const weatherByDate = new Map((await getAllWeather()).map((weather) => [weather.date, weather.summary]));
+  for (const sale of sales) {
     if (!weatherByDate.has(sale.date)) weatherByDate.set(sale.date, sale.weather);
   }
 
@@ -138,7 +139,7 @@ export function getWeatherMonthlySalesTrend(filters: {
     ? [filters.groupBy]
     : ["sky", "rain"];
   const buckets = new Map<string, Map<string, number>>();
-  for (const sale of getSales()) {
+  for (const sale of sales) {
     const summary = weatherByDate.get(sale.date);
     if (!summary) continue;
     for (const target of targets) {

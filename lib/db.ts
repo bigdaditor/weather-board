@@ -1,6 +1,4 @@
-import { mkdirSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
-import { join } from "node:path";
+import { getSupabase } from "@/lib/supabase";
 
 export type Sale = {
   id: number;
@@ -24,178 +22,214 @@ export type Weather = {
   summary: string;
 };
 
-const directory = join(process.cwd(), ".data");
-mkdirSync(directory, { recursive: true });
-export const db = new DatabaseSync(join(directory, "weather-board.db"));
+type SaleRow = {
+  id: number;
+  input_date: string;
+  amount: number;
+  payment_type: string;
+  created_at: string;
+  sync_status: number;
+};
 
-db.exec("PRAGMA busy_timeout = 5000");
+type WeatherRow = {
+  date: string;
+  avg_temp: number;
+  min_temp: number;
+  max_temp: number;
+  sum_rain: number;
+  avg_humidity: number;
+  one_hour_rain: number;
+  summary: string;
+};
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS sale (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    input_date TEXT NOT NULL,
-    amount INTEGER NOT NULL,
-    payment_type TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    sync_status INTEGER NOT NULL DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS weather (
-    date TEXT PRIMARY KEY,
-    avg_temp REAL NOT NULL,
-    min_temp REAL NOT NULL,
-    max_temp REAL NOT NULL,
-    sum_rain REAL NOT NULL,
-    avg_humidity REAL NOT NULL,
-    one_hour_rain REAL NOT NULL,
-    summary TEXT NOT NULL
-  );
-`);
-
-const legacySalesExists = (db.prepare(`
-  SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'sales'
-`).get() as { count: number }).count > 0;
-
-if (legacySalesExists && (db.prepare("SELECT COUNT(*) AS count FROM sale").get() as { count: number }).count === 0) {
-  db.exec(`
-    INSERT OR IGNORE INTO sale (id, input_date, amount, payment_type, created_at, sync_status)
-    SELECT id, date, amount, payment_type, created_at, sync_status FROM sales
-  `);
-
-  db.exec(`
-    INSERT OR IGNORE INTO weather (date, avg_temp, min_temp, max_temp, sum_rain, avg_humidity, one_hour_rain, summary)
-    SELECT date, temperature, temperature, temperature, 0, 0, 0, weather FROM sales
-  `);
+function toWeather(row: WeatherRow): Weather {
+  return {
+    date: row.date,
+    avgTemp: Number(row.avg_temp),
+    minTemp: Number(row.min_temp),
+    maxTemp: Number(row.max_temp),
+    sumRain: Number(row.sum_rain),
+    avgHumidity: Number(row.avg_humidity),
+    oneHourRain: Number(row.one_hour_rain),
+    summary: row.summary,
+  };
 }
 
-function toSale(row: Record<string, unknown>): Sale {
+function toSale(row: SaleRow, weather?: Weather): Sale {
   return {
     id: Number(row.id),
-    date: String(row.date),
+    date: row.input_date,
     amount: Number(row.amount),
-    paymentType: String(row.paymentType),
-    weather: String(row.weather),
-    temperature: Number(row.temperature),
-    createdAt: String(row.createdAt),
-    syncStatus: Number(row.syncStatus),
+    paymentType: row.payment_type,
+    weather: weather?.summary ?? "미동기화",
+    temperature: Math.round(weather?.maxTemp ?? 0),
+    createdAt: row.created_at,
+    syncStatus: Number(row.sync_status),
   };
 }
 
-function toWeather(row: Record<string, unknown>): Weather {
-  return {
-    date: String(row.date),
-    avgTemp: Number(row.avgTemp),
-    minTemp: Number(row.minTemp),
-    maxTemp: Number(row.maxTemp),
-    sumRain: Number(row.sumRain),
-    avgHumidity: Number(row.avgHumidity),
-    oneHourRain: Number(row.oneHourRain),
-    summary: String(row.summary),
-  };
+function assertSingle<T>(data: T | null | undefined): NonNullable<T> {
+  if (!data) throw new Error("Supabase returned no row");
+  return data as NonNullable<T>;
 }
 
-const saleSelect = `
-  SELECT sale.id,
-         sale.input_date AS date,
-         sale.amount,
-         sale.payment_type AS paymentType,
-         COALESCE(weather.summary, '미동기화') AS weather,
-         COALESCE(ROUND(weather.max_temp), 0) AS temperature,
-         sale.created_at AS createdAt,
-         sale.sync_status AS syncStatus
-  FROM sale
-  LEFT JOIN weather ON weather.date = sale.input_date
-`;
+export async function getSales(): Promise<Sale[]> {
+  const supabase = getSupabase();
+  const [{ data: saleRows, error: saleError }, { data: weatherRows, error: weatherError }] = await Promise.all([
+    supabase
+      .from("sale")
+      .select("id,input_date,amount,payment_type,created_at,sync_status")
+      .order("input_date", { ascending: false })
+      .order("id", { ascending: false }),
+    supabase
+      .from("weather")
+      .select("date,avg_temp,min_temp,max_temp,sum_rain,avg_humidity,one_hour_rain,summary"),
+  ]);
 
-export function getSales(): Sale[] {
-  return (db.prepare(`${saleSelect} ORDER BY date DESC, id DESC`).all() as Record<string, unknown>[]).map(toSale);
+  if (saleError) throw saleError;
+  if (weatherError) throw weatherError;
+
+  const weatherByDate = new Map((weatherRows ?? []).map((row) => [row.date, toWeather(row as WeatherRow)]));
+  return (saleRows ?? []).map((row) => toSale(row as SaleRow, weatherByDate.get(row.input_date)));
 }
 
-export function getSaleById(id: number): Sale | undefined {
-  const row = db.prepare(`${saleSelect} WHERE sale.id = ?`).get(id) as Record<string, unknown> | undefined;
-  return row ? toSale(row) : undefined;
+export async function getSaleById(id: number): Promise<Sale | undefined> {
+  const supabase = getSupabase();
+  const { data: saleRow, error } = await supabase
+    .from("sale")
+    .select("id,input_date,amount,payment_type,created_at,sync_status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!saleRow) return undefined;
+
+  const { data: weatherRow, error: weatherError } = await supabase
+    .from("weather")
+    .select("date,avg_temp,min_temp,max_temp,sum_rain,avg_humidity,one_hour_rain,summary")
+    .eq("date", saleRow.input_date)
+    .maybeSingle();
+
+  if (weatherError) throw weatherError;
+  return toSale(saleRow as SaleRow, weatherRow ? toWeather(weatherRow as WeatherRow) : undefined);
 }
 
-export function insertSale(sale: Omit<Sale, "id" | "weather" | "temperature">): Sale {
-  const result = db.prepare(`
-    INSERT INTO sale (input_date, amount, payment_type, created_at, sync_status)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(
-    sale.date,
-    sale.amount,
-    sale.paymentType,
-    sale.createdAt,
-    sale.syncStatus,
-  );
-  return getSaleById(Number(result.lastInsertRowid))!;
+export async function insertSale(sale: Omit<Sale, "id" | "weather" | "temperature">): Promise<Sale> {
+  const { data, error } = await getSupabase()
+    .from("sale")
+    .insert({
+      input_date: sale.date,
+      amount: sale.amount,
+      payment_type: sale.paymentType,
+      created_at: sale.createdAt,
+      sync_status: sale.syncStatus,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return assertSingle(await getSaleById(Number(data.id)));
 }
 
-export function updateSaleByDateAndPaymentType(
+export async function updateSaleByDateAndPaymentType(
   date: string,
   paymentType: string,
   values: Pick<Sale, "amount" | "syncStatus">,
-): Sale | undefined {
-  const existing = db.prepare(`${saleSelect} WHERE sale.input_date = ? AND sale.payment_type = ? LIMIT 1`)
-    .get(date, paymentType) as Record<string, unknown> | undefined;
+): Promise<Sale | undefined> {
+  const supabase = getSupabase();
+  const { data: existing, error: findError } = await supabase
+    .from("sale")
+    .select("id")
+    .eq("input_date", date)
+    .eq("payment_type", paymentType)
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) throw findError;
   if (!existing) return undefined;
 
-  db.prepare("UPDATE sale SET amount = ?, sync_status = ? WHERE id = ?")
-    .run(values.amount, values.syncStatus, existing.id as number);
+  const { error } = await supabase
+    .from("sale")
+    .update({ amount: values.amount, sync_status: values.syncStatus })
+    .eq("id", existing.id);
+
+  if (error) throw error;
   return getSaleById(Number(existing.id));
 }
 
-export function deleteSaleByDateAndPaymentType(date: string, paymentType: string): Sale | undefined {
-  const existing = db.prepare(`${saleSelect} WHERE sale.input_date = ? AND sale.payment_type = ? LIMIT 1`)
-    .get(date, paymentType) as Record<string, unknown> | undefined;
-  if (!existing) return undefined;
+export async function deleteSaleByDateAndPaymentType(date: string, paymentType: string): Promise<Sale | undefined> {
+  const supabase = getSupabase();
+  const sale = (await getSales()).find((row) => row.date === date && row.paymentType === paymentType);
+  if (!sale) return undefined;
 
-  db.prepare("DELETE FROM sale WHERE id = ?").run(existing.id as number);
-  return toSale(existing);
+  const { error } = await supabase.from("sale").delete().eq("id", sale.id);
+  if (error) throw error;
+  return sale;
 }
 
-export function getUnsyncedSales(limit = 10): Sale[] {
-  return (db.prepare(`${saleSelect} WHERE sale.sync_status = 0 ORDER BY sale.input_date LIMIT ?`)
-    .all(limit) as Record<string, unknown>[]).map(toSale);
+export async function getUnsyncedSales(limit = 10): Promise<Sale[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("sale")
+    .select("id,input_date,amount,payment_type,created_at,sync_status")
+    .eq("sync_status", 0)
+    .order("input_date", { ascending: true })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => toSale(row as SaleRow));
 }
 
-export function upsertWeather(weather: Weather) {
-  db.prepare(`
-    INSERT INTO weather (date, avg_temp, min_temp, max_temp, sum_rain, avg_humidity, one_hour_rain, summary)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(date) DO UPDATE SET
-      avg_temp = excluded.avg_temp, min_temp = excluded.min_temp, max_temp = excluded.max_temp,
-      sum_rain = excluded.sum_rain, avg_humidity = excluded.avg_humidity,
-      one_hour_rain = excluded.one_hour_rain, summary = excluded.summary
-  `).run(
-    weather.date,
-    weather.avgTemp,
-    weather.minTemp,
-    weather.maxTemp,
-    weather.sumRain,
-    weather.avgHumidity,
-    weather.oneHourRain,
-    weather.summary,
-  );
+export async function upsertWeather(weather: Weather): Promise<void> {
+  const { error } = await getSupabase()
+    .from("weather")
+    .upsert({
+      date: weather.date,
+      avg_temp: weather.avgTemp,
+      min_temp: weather.minTemp,
+      max_temp: weather.maxTemp,
+      sum_rain: weather.sumRain,
+      avg_humidity: weather.avgHumidity,
+      one_hour_rain: weather.oneHourRain,
+      summary: weather.summary,
+    });
+
+  if (error) throw error;
 }
 
-export function markSalesSynced(weather: Weather) {
-  db.prepare(`
-    UPDATE sale SET sync_status = 1
-    WHERE input_date = ?
-  `).run(weather.date);
+export async function markSalesSynced(weather: Weather): Promise<void> {
+  const { error } = await getSupabase()
+    .from("sale")
+    .update({ sync_status: 1 })
+    .eq("input_date", weather.date);
+
+  if (error) throw error;
 }
 
-export function getWeatherByMonth(month: string): Weather[] {
-  return (db.prepare(`
-    SELECT date, avg_temp AS avgTemp, min_temp AS minTemp, max_temp AS maxTemp,
-           sum_rain AS sumRain, avg_humidity AS avgHumidity, one_hour_rain AS oneHourRain, summary
-    FROM weather WHERE date LIKE ? ORDER BY date
-  `).all(`${month}%`) as Record<string, unknown>[]).map(toWeather);
+export async function getWeatherByMonth(month: string): Promise<Weather[]> {
+  const { data, error } = await getSupabase()
+    .from("weather")
+    .select("date,avg_temp,min_temp,max_temp,sum_rain,avg_humidity,one_hour_rain,summary")
+    .gte("date", `${month}-01`)
+    .lt("date", nextMonth(month))
+    .order("date", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => toWeather(row as WeatherRow));
 }
 
-export function getAllWeather(): Weather[] {
-  return (db.prepare(`
-    SELECT date, avg_temp AS avgTemp, min_temp AS minTemp, max_temp AS maxTemp,
-           sum_rain AS sumRain, avg_humidity AS avgHumidity, one_hour_rain AS oneHourRain, summary
-    FROM weather ORDER BY date
-  `).all() as Record<string, unknown>[]).map(toWeather);
+export async function getAllWeather(): Promise<Weather[]> {
+  const { data, error } = await getSupabase()
+    .from("weather")
+    .select("date,avg_temp,min_temp,max_temp,sum_rain,avg_humidity,one_hour_rain,summary")
+    .order("date", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => toWeather(row as WeatherRow));
+}
+
+function nextMonth(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthIndex, 1));
+  return date.toISOString().slice(0, 10);
 }

@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ periodType: string }> },
 ) {
   try {
-    return Response.json(getStatistics({
+    return Response.json(await getStatistics({
       periodType: (await params).periodType,
       paymentType: new URL(request.url).searchParams.get("payment_type") ?? "all",
     }));

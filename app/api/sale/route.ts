@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
       throw new ApiError(422, "page_size must be an integer from 1 to 100");
     }
-    return Response.json(getGroupedSales(page, pageSize));
+    return Response.json(await getGroupedSales(page, pageSize));
   } catch (error) {
     return errorResponse(error);
   }
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const sale = updateSaleRecord(await readJsonObject(request));
+    const sale = await updateSaleRecord(await readJsonObject(request));
     revalidatePath("/", "layout");
     return Response.json(sale);
   } catch (error) {
@@ -45,7 +45,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const sale = deleteSaleRecord(await readJsonObject(request));
+    const sale = await deleteSaleRecord(await readJsonObject(request));
     revalidatePath("/", "layout");
     return Response.json(sale);
   } catch (error) {

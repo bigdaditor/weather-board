@@ -5,8 +5,8 @@ import { formatCompactCurrency, formatCurrency, formatDate } from "@/util/format
 
 export const dynamic = "force-dynamic";
 
-export default function WeatherPage() {
-  const sales = getSales();
+export default async function WeatherPage() {
+  const sales = await getSales();
   const summaries = ["맑음", "흐림", "비", "눈"].map((weather) => {
     const rows = sales.filter((sale) => sale.weather === weather);
     const total = rows.reduce((sum, sale) => sum + sale.amount, 0);

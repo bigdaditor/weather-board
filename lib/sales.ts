@@ -64,16 +64,16 @@ export async function createSaleRecord(data: Record<string, unknown>) {
   });
 }
 
-export function getSaleRecord(id: number) {
+export async function getSaleRecord(id: number) {
   if (!Number.isInteger(id) || id < 1) throw new ApiError(422, "sale_id must be a positive integer");
-  const sale = getSaleById(id);
+  const sale = await getSaleById(id);
   if (!sale) throw new ApiError(404, "Sale not found");
   return toSaleApiRecord(sale);
 }
 
-export function getGroupedSales(page: number, pageSize: number) {
+export async function getGroupedSales(page: number, pageSize: number) {
   const grouped = new Map<string, { date: string; payment_types: Record<string, number>; total_amount: number }>();
-  for (const sale of [...getSales()].reverse()) {
+  for (const sale of [...await getSales()].reverse()) {
     const row = grouped.get(sale.date) ?? { date: sale.date, payment_types: {}, total_amount: 0 };
     row.payment_types[sale.paymentType] = (row.payment_types[sale.paymentType] ?? 0) + sale.amount;
     row.total_amount += sale.amount;
@@ -93,28 +93,28 @@ export function getGroupedSales(page: number, pageSize: number) {
   };
 }
 
-export function getMonthlySales(month: string) {
+export async function getMonthlySales(month: string) {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new ApiError(422, "key must use YYYY-MM");
   const daily = new Map<string, number>();
-  for (const sale of getSales().filter(({ date }) => date.startsWith(month))) {
+  for (const sale of (await getSales()).filter(({ date }) => date.startsWith(month))) {
     daily.set(sale.date, (daily.get(sale.date) ?? 0) + sale.amount);
   }
   if (daily.size === 0) throw new ApiError(404, "Sales not found");
   return { data: [...daily].sort().map(([date, total_amount]) => ({ date, total_amount })) };
 }
 
-export function updateSaleRecord(data: Record<string, unknown>) {
+export async function updateSaleRecord(data: Record<string, unknown>) {
   const date = requireDate(data.input_date);
   const paymentType = requirePaymentType(data.payment_type);
   const amount = requireAmount(data.amount);
   const syncStatus = Number.isInteger(data.sync_status) ? Number(data.sync_status) : 0;
-  const sale = updateSaleByDateAndPaymentType(date, paymentType, { amount, syncStatus });
+  const sale = await updateSaleByDateAndPaymentType(date, paymentType, { amount, syncStatus });
   if (!sale) throw new ApiError(404, "Sale not found");
   return toSaleApiRecord(sale);
 }
 
-export function deleteSaleRecord(data: Record<string, unknown>) {
-  const sale = deleteSaleByDateAndPaymentType(requireDate(data.input_date), requirePaymentType(data.payment_type));
+export async function deleteSaleRecord(data: Record<string, unknown>) {
+  const sale = await deleteSaleByDateAndPaymentType(requireDate(data.input_date), requirePaymentType(data.payment_type));
   if (!sale) throw new ApiError(404, "Sale not found");
   return toSaleApiRecord(sale);
 }

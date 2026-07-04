@@ -111,12 +111,13 @@ async function fetchKmaWeather(startDate: string, endDate: string): Promise<KmaI
 }
 
 export async function syncWeather(): Promise<Weather[]> {
-  const sales = getUnsyncedSales();
+  const sales = await getUnsyncedSales();
   if (sales.length === 0) throw new ApiError(404, "Sale not found");
 
   const items = await fetchKmaWeather(sales[0].date, sales.at(-1)!.date);
-  const weatherRows = items.flatMap((item): Weather[] => {
-    if (!item.tm) return [];
+  const weatherRows: Weather[] = [];
+  for (const item of items) {
+    if (!item.tm) continue;
     const oneHourRain = numberValue(item.hr1MaxRn);
     const weather = {
       date: normalizeDate(item.tm),
@@ -128,14 +129,14 @@ export async function syncWeather(): Promise<Weather[]> {
       oneHourRain,
       summary: classifyWeather(oneHourRain, numberValue(item.avgTca)),
     };
-    upsertWeather(weather);
-    markSalesSynced(weather);
-    return [weather];
-  });
+    await upsertWeather(weather);
+    await markSalesSynced(weather);
+    weatherRows.push(weather);
+  }
   return weatherRows;
 }
 
-export function readWeatherByMonth(month: string) {
+export async function readWeatherByMonth(month: string) {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new ApiError(400, "month query parameter must use YYYY-MM");
   return getWeatherByMonth(month);
 }

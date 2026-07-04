@@ -10,8 +10,8 @@ const weatherIcon: Record<string, string> = {
   눈: "눈",
 };
 
-export default function CalendarPage() {
-  const sales = getSales();
+export default async function CalendarPage() {
+  const sales = await getSales();
   const calendar = Array.from({ length: 35 }, (_, index) => {
     const day = index - 4;
     return day > 0 && day <= 30 ? sales.filter((sale) => Number(sale.date.slice(8)) === day) : [];
