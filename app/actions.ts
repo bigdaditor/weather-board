@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { insertSale } from "@/lib/db";
-import { getWeatherForDate } from "@/lib/weather";
+import { createSaleRecord } from "@/lib/sales";
 
 export type CreateSaleState = {
   success: boolean;
@@ -19,14 +18,10 @@ export async function createSale(_: CreateSaleState, formData: FormData): Promis
   }
 
   try {
-    const weather = await getWeatherForDate(date);
-
-    insertSale({
-      date,
+    await createSaleRecord({
+      input_date: date,
       amount,
-      paymentType,
-      weather: weather.label,
-      temperature: weather.temperature,
+      payment_type: paymentType,
     });
   } catch (error) {
     console.error("Failed to create sale", error);

@@ -2,7 +2,10 @@ declare module "node:sqlite" {
   export class StatementSync {
     all(...values: unknown[]): unknown[];
     get(...values: unknown[]): unknown;
-    run(...values: unknown[]): unknown;
+    run(...values: unknown[]): {
+      changes: number;
+      lastInsertRowid: number | bigint;
+    };
   }
 
   export class DatabaseSync {
