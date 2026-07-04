@@ -19,8 +19,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## Backend API
 
 The sales, weather, and statistics backend runs in Next.js Route Handlers and
-shares the same SQLite database as the dashboard. Data is stored in
-`.data/weather-board.db`.
+uses Supabase for persistence.
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -34,8 +33,16 @@ shares the same SQLite database as the dashboard. Data is stored in
 | GET | `/api/statistics/weather/monthly` | Monthly weather-sales trends |
 | POST | `/api/statistics/recompute` | Validate statistics recomputation |
 
-Set `KMA_SERVICE_KEY` in `.env.local` to enable `POST /api/weather`. Sale
-creation uses Open-Meteo to attach weather information automatically.
+Configure the following values in `.env.local` or your deployment environment:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+KMA_SERVICE_KEY=
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` is server-only and must not be exposed to browser
+code. Set `KMA_SERVICE_KEY` to enable `POST /api/weather`.
 
 ## Learn More
 
