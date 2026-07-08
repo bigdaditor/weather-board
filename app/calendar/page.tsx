@@ -3,23 +3,40 @@ import { formatCurrency } from "@/util/format";
 
 export const dynamic = "force-dynamic";
 
+const month = "2026-06";
+
 const weatherIcon: Record<string, string> = {
   맑음: "맑",
   흐림: "흐",
   비: "비",
+  강우: "비",
   눈: "눈",
 };
 
 export default async function CalendarPage() {
-  const sales = await getSales();
+  const sales = (await getSales()).filter((sale) => sale.date.startsWith(month));
+  const firstDay = new Date(`${month}-01T00:00:00Z`);
+  const startOffset = firstDay.getUTCDay();
+  const daysInMonth = new Date(Date.UTC(firstDay.getUTCFullYear(), firstDay.getUTCMonth() + 1, 0)).getUTCDate();
+  const salesByDate = new Map<string, typeof sales>();
+
+  for (const sale of sales) {
+    const rows = salesByDate.get(sale.date) ?? [];
+    rows.push(sale);
+    salesByDate.set(sale.date, rows);
+  }
+
   const calendar = Array.from({ length: 35 }, (_, index) => {
-    const day = index - 4;
-    return day > 0 && day <= 30 ? sales.filter((sale) => Number(sale.date.slice(8)) === day) : [];
+    const day = index - startOffset + 1;
+    if (day < 1 || day > daysInMonth) return { day: null, rows: [] };
+
+    const date = `${month}-${String(day).padStart(2, "0")}`;
+    return { day, rows: salesByDate.get(date) ?? [] };
   });
 
   return (
     <>
-      <header>
+      <header className="calendar-header">
         <div>
           <p className="eyebrow">DAILY VIEW</p>
           <h1>매출 캘린더</h1>
@@ -30,18 +47,17 @@ export default async function CalendarPage() {
       <article className="panel calendar-panel page-panel">
         <div className="panel-title">
           <div><span className="kicker">JUNE 2026</span><h2>2026년 6월</h2></div>
-          <div className="calendar-nav"><button aria-label="이전 달">‹</button><button aria-label="다음 달">›</button></div>
         </div>
         <div className="calendar week">
           {["일", "월", "화", "수", "목", "금", "토"].map((day) => <span key={day}>{day}</span>)}
         </div>
         <div className="calendar calendar-large">
-          {calendar.map((rows, index) => (
+          {calendar.map(({ day, rows }, index) => (
             <div className={rows.length ? "calendar-day has-sale" : "calendar-day"} key={index}>
-              {index > 4 && index < 35 && <b>{index - 4}</b>}
+              {day && <b>{day}</b>}
               {rows.map((sale) => (
                 <div className="calendar-entry" key={sale.id}>
-                  <span>{weatherIcon[sale.weather]} {sale.temperature}°</span>
+                  <span>{weatherIcon[sale.weather] ?? sale.weather} {sale.temperature}°</span>
                   <strong>{formatCurrency(sale.amount)}</strong>
                 </div>
               ))}

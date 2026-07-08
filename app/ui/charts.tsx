@@ -1,22 +1,62 @@
 import type { Sale } from "@/lib/db";
 import { formatCompactCurrency, formatShortDate } from "@/util/format";
 
-export function LineChart({ sales }: { sales: Sale[] }) {
-  const ordered = [...sales].reverse();
-  const max = Math.max(...ordered.map((sale) => sale.amount));
-  const points = ordered.map((sale, index) => `${24 + index * (552 / (ordered.length - 1))},${185 - sale.amount / max * 145}`).join(" ");
+const lineChartWidth = 600;
+const lineChartHeight = 210;
+const chartLeft = 36;
+const chartRight = 582;
+const chartTop = 28;
+const chartBottom = 170;
+
+function formatAxisCurrency(value: number) {
+  if (value >= 10000) return `${Math.round(value / 10000)}만원`;
+  return `${Math.round(value).toLocaleString("ko-KR")}원`;
+}
+
+export function LineChart({ sales, days = 30 }: { sales: Sale[]; days?: number }) {
+  const daily = new Map<string, number>();
+
+  for (const sale of sales) {
+    daily.set(sale.date, (daily.get(sale.date) ?? 0) + sale.amount);
+  }
+
+  const ordered = [...daily.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-days)
+    .map(([date, amount]) => ({ date, amount }));
+  const maxAmount = Math.max(...ordered.map((sale) => sale.amount), 1);
+  const max = Math.ceil(maxAmount / 500000) * 500000 || 500000;
+  const stepX = ordered.length > 1 ? (chartRight - chartLeft) / (ordered.length - 1) : 0;
+  const pointFor = (amount: number, index: number) => ({
+    x: ordered.length > 1 ? chartLeft + index * stepX : (chartLeft + chartRight) / 2,
+    y: chartBottom - (amount / max) * (chartBottom - chartTop),
+  });
+  const points = ordered.map((sale, index) => {
+    const { x, y } = pointFor(sale.amount, index);
+    return `${x},${y}`;
+  }).join(" ");
+  const baseline = chartBottom + 12;
+  const yTicks = [max, Math.round(max / 2), 0];
+  const labelStep = Math.max(1, Math.ceil(ordered.length / 5));
+  const visibleLabels = ordered.filter((_, index) => index === 0 || index === ordered.length - 1 || index % labelStep === 0);
 
   return (
     <div className="line-chart">
-      <div className="y-labels"><span>1.5M</span><span>1.0M</span><span>500K</span><span>0</span></div>
-      <svg viewBox="0 0 600 210" preserveAspectRatio="none">
+      <div className="y-labels">{yTicks.map((tick) => <span key={tick}>{formatAxisCurrency(tick)}</span>)}</div>
+      <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} preserveAspectRatio="none">
         <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="oklch(57.61% .2508 258.23)" stopOpacity=".24" /><stop offset="100%" stopColor="white" stopOpacity="0" /></linearGradient></defs>
-        {[40, 85, 130, 175].map((y) => <line key={y} x1="20" y1={y} x2="590" y2={y} />)}
-        <polygon points={`${points} 576,190 24,190`} fill="url(#area)" />
+        {yTicks.map((tick) => {
+          const y = chartBottom - (tick / max) * (chartBottom - chartTop);
+          return <line key={tick} x1={chartLeft} y1={y} x2={chartRight} y2={y} />;
+        })}
+        {points && <polygon points={`${points} ${chartRight},${baseline} ${chartLeft},${baseline}`} fill="url(#area)" />}
         <polyline points={points} />
-        {ordered.map((sale, index) => <circle key={sale.id} cx={24 + index * (552 / (ordered.length - 1))} cy={185 - sale.amount / max * 145} r="4" />)}
+        {ordered.map((sale, index) => {
+          const { x, y } = pointFor(sale.amount, index);
+          return <circle key={sale.date} cx={x} cy={y} r={ordered.length > 45 ? "3" : "5"} />;
+        })}
       </svg>
-      <div className="x-labels">{ordered.filter((_, index) => index % 2 === 0).map((sale) => <span key={sale.id}>{formatShortDate(sale.date)}</span>)}</div>
+      <div className="x-labels">{visibleLabels.map((sale) => <span key={sale.date}>{formatShortDate(sale.date)}</span>)}</div>
     </div>
   );
 }

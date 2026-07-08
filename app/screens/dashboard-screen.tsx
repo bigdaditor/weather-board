@@ -25,13 +25,14 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
   const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
   const average = Math.round(total / sales.length);
   const best = [...sales].sort((a, b) => b.amount - a.amount)[0];
+  const periodDays = Number(period.replace("일", ""));
 
   return (
     <>
         <header>
           <div>
             <p className="eyebrow">WEATHER SALES ANALYTICS</p>
-            <h1>매출 대시보드</h1>
+            <h1>매출 현황</h1>
             <p>날씨와 매출의 관계를 한눈에 확인하세요.</p>
           </div>
           <Button onClick={() => setModalOpen(true)}>+ 매출 입력</Button>
@@ -39,45 +40,45 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
 
         <section className="metrics" id="overview">
           <article className="metric primary">
-            <span>이번 달 총 매출</span>
+            <span>총 매출</span>
             <strong>{formatCurrency(total)}</strong>
             <small>지난달 대비 ▲ 12.8%</small>
           </article>
           <article className="metric">
-            <span>일 평균 매출</span>
+            <span>하루 평균</span>
             <strong>{formatCurrency(average)}</strong>
             <small>최근 {sales.length}일 기준</small>
           </article>
           <article className="metric">
-            <span>최고 매출일</span>
+            <span>가장 높은 날</span>
             <strong>{formatCurrency(best.amount)}</strong>
             <small>{formatDate(best.date)} · {best.weather}</small>
           </article>
           <article className="metric">
-            <span>매출이 높은 날씨</span>
+            <span>좋은 날씨</span>
             <strong>맑음</strong>
             <small>평균 매출 {formatCurrency(1284000)}</small>
           </article>
         </section>
 
-        <section className="chart-grid">
+        <section className="chart-grid dashboard-chart-grid">
           <article className="panel chart-panel">
             <div className="panel-title">
-              <div><span className="kicker">WEATHER IMPACT</span><h2>날씨별 평균 매출</h2></div>
+              <div><span className="kicker">WEATHER IMPACT</span><h2>날씨별 매출</h2></div>
               <Link className="text-button" href="/weather">상세보기 →</Link>
             </div>
             <WeatherChart sales={sales} />
           </article>
           <article className="panel chart-panel">
             <div className="panel-title">
-              <div><span className="kicker">SALES TREND</span><h2>기간별 매출 추이</h2></div>
+              <div><span className="kicker">SALES TREND</span><h2>매출 추이</h2></div>
               <div className="tabs">
                 {["7일", "30일", "90일"].map((item) => (
                   <button className={period === item ? "selected" : ""} key={item} onClick={() => setPeriod(item)}>{item}</button>
                 ))}
               </div>
             </div>
-            <LineChart sales={period === "7일" ? sales.slice(0, 7) : sales} />
+            <LineChart sales={sales} days={periodDays} />
           </article>
         </section>
 
