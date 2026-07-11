@@ -2,6 +2,15 @@ import { DataTable } from "@/app/ui/table";
 import { SalesPeriodSelect } from "@/app/ui/sales-period-select";
 import { getSales, type Sale } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/util/format";
+import {
+  currentMonth,
+  formatMonthLabel,
+  monthFromDate,
+  searchParam,
+  type SearchParams,
+  yearFromDate,
+} from "@/util/month";
+import { paymentTypes, summarizePayments } from "@/util/sales-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -13,35 +22,8 @@ const weatherIcon: Record<string, string> = {
   눈: "눈",
 };
 
-const paymentTypes = ["카드", "현금", "지역상품권"];
-
-type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
-
-function firstValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function getMonth(date: string) {
-  return date.slice(0, 7);
-}
-
-function getYear(date: string) {
-  return date.slice(0, 4);
-}
-
-function formatMonthLabel(month: string) {
-  const [year, monthNumber] = month.split("-");
-  return `${year}년 ${Number(monthNumber)}월`;
-}
-
 function filterSales(sales: Sale[], mode: string, period: string) {
-  return sales.filter((sale) => mode === "year" ? sale.date.startsWith(period) : getMonth(sale.date) === period);
-}
-
-function sumPayment(rows: Sale[], paymentType: string) {
-  return rows
-    .filter((sale) => sale.paymentType === paymentType)
-    .reduce((sum, sale) => sum + sale.amount, 0);
+  return sales.filter((sale) => mode === "year" ? sale.date.startsWith(period) : monthFromDate(sale.date) === period);
 }
 
 function groupDailySales(sales: Sale[]) {
@@ -56,11 +38,12 @@ function groupDailySales(sales: Sale[]) {
     .map(([date, rows]) => {
       const first = rows[0];
       const total = rows.reduce((sum, sale) => sum + sale.amount, 0);
+      const payments = summarizePayments(rows);
       return [
         formatDate(date),
         `${weatherIcon[first.weather] ?? first.weather} ${first.weather}`,
         ...paymentTypes.map((paymentType) => {
-          const amount = sumPayment(rows, paymentType);
+          const amount = payments[paymentType].amount;
           return amount > 0 ? formatCurrency(amount) : "-";
         }),
         formatCurrency(total),
@@ -72,7 +55,7 @@ function groupMonthlySales(sales: Sale[]) {
   const grouped = new Map<string, Sale[]>();
 
   for (const sale of sales) {
-    const month = getMonth(sale.date);
+    const month = monthFromDate(sale.date);
     grouped.set(month, [...(grouped.get(month) ?? []), sale]);
   }
 
@@ -80,10 +63,11 @@ function groupMonthlySales(sales: Sale[]) {
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([month, rows]) => {
       const total = rows.reduce((sum, sale) => sum + sale.amount, 0);
+      const payments = summarizePayments(rows);
       return [
         formatMonthLabel(month),
         ...paymentTypes.map((paymentType) => {
-          const amount = sumPayment(rows, paymentType);
+          const amount = payments[paymentType].amount;
           return amount > 0 ? formatCurrency(amount) : "-";
         }),
         formatCurrency(total),
@@ -94,33 +78,28 @@ function groupMonthlySales(sales: Sale[]) {
 export default async function SalesPage({ searchParams }: { searchParams: SearchParams }) {
   const sales = await getSales();
   const params = await searchParams;
-  const months = [...new Set(sales.map((sale) => getMonth(sale.date)))].sort((a, b) => b.localeCompare(a));
-  const years = [...new Set(sales.map((sale) => getYear(sale.date)))].sort((a, b) => b.localeCompare(a));
-  const mode = firstValue(params.view) === "year" ? "year" : "month";
-  const requestedMonth = firstValue(params.month);
-  const requestedYear = firstValue(params.year);
-  const fallbackMonth = months[0] ?? "2026-06";
+  const months = [...new Set(sales.map((sale) => monthFromDate(sale.date)))].sort((a, b) => b.localeCompare(a));
+  const years = [...new Set(sales.map((sale) => yearFromDate(sale.date)))].sort((a, b) => b.localeCompare(a));
+  const mode = searchParam(params, "view") === "year" ? "year" : "month";
+  const requestedMonth = searchParam(params, "month");
+  const requestedYear = searchParam(params, "year");
+  const fallbackMonth = months[0] ?? currentMonth();
   const hasRequestedYear = years.includes(requestedYear ?? "");
-  const baseYear = hasRequestedYear ? requestedYear! : getYear(fallbackMonth);
-  const baseYearMonths = months.filter((month) => getYear(month) === baseYear);
+  const baseYear = hasRequestedYear ? requestedYear! : yearFromDate(fallbackMonth);
+  const baseYearMonths = months.filter((month) => yearFromDate(month) === baseYear);
   const hasRequestedMonth = months.includes(requestedMonth ?? "")
-    && (!hasRequestedYear || getYear(requestedMonth!) === baseYear);
+    && (!hasRequestedYear || yearFromDate(requestedMonth!) === baseYear);
   const selectedMonth = hasRequestedMonth ? requestedMonth! : (baseYearMonths[0] ?? fallbackMonth);
-  const selectedYear = mode === "year" && hasRequestedYear ? requestedYear! : getYear(selectedMonth);
+  const selectedYear = mode === "year" && hasRequestedYear ? requestedYear! : yearFromDate(selectedMonth);
   const selectedPeriod = mode === "year" ? selectedYear : selectedMonth;
   const filteredSales = filterSales(sales, mode, selectedPeriod);
   const total = filteredSales.reduce((sum, sale) => sum + sale.amount, 0);
-  const paymentTotals = Object.fromEntries(
-    paymentTypes.map((paymentType) => [
-      paymentType,
-      sumPayment(filteredSales, paymentType),
-    ]),
-  );
+  const paymentSummary = summarizePayments(filteredSales);
   const rows = mode === "year" ? groupMonthlySales(filteredSales) : groupDailySales(filteredSales);
   const columns = mode === "year"
     ? ["월", ...paymentTypes, "합계"]
     : ["날짜", "날씨", ...paymentTypes, "합계"];
-  const monthsInSelectedYear = months.filter((month) => getYear(month) === selectedYear);
+  const monthsInSelectedYear = months.filter((month) => yearFromDate(month) === selectedYear);
 
   return (
     <>
@@ -137,8 +116,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
         {paymentTypes.map((paymentType) => (
           <article className="metric" key={paymentType}>
             <span>{paymentType}</span>
-            <strong>{formatCurrency(paymentTotals[paymentType])}</strong>
-            <small>{filteredSales.filter((sale) => sale.paymentType === paymentType).length}건</small>
+            <strong>{formatCurrency(paymentSummary[paymentType].amount)}</strong>
+            <small>{paymentSummary[paymentType].count}건</small>
           </article>
         ))}
       </section>

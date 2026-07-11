@@ -7,6 +7,7 @@ import {
   type Sale,
 } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
+import { isMonth, monthFromDate } from "@/util/month";
 
 export type SaleApiRecord = {
   id: number;
@@ -94,9 +95,9 @@ export async function getGroupedSales(page: number, pageSize: number) {
 }
 
 export async function getMonthlySales(month: string) {
-  if (!/^\d{4}-\d{2}$/.test(month)) throw new ApiError(422, "key must use YYYY-MM");
+  if (!isMonth(month)) throw new ApiError(422, "key must use YYYY-MM");
   const daily = new Map<string, number>();
-  for (const sale of (await getSales()).filter(({ date }) => date.startsWith(month))) {
+  for (const sale of (await getSales()).filter(({ date }) => monthFromDate(date) === month)) {
     daily.set(sale.date, (daily.get(sale.date) ?? 0) + sale.amount);
   }
   if (daily.size === 0) throw new ApiError(404, "Sales not found");

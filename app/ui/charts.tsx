@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Sale } from "@/lib/db";
 import { formatCompactCurrency, formatCurrency, formatShortDate } from "@/util/format";
+import { summarizeWeatherSales } from "@/util/sales-summary";
 
 const lineChartWidth = 600;
 const lineChartHeight = 210;
@@ -89,10 +90,7 @@ export function LineChart({ sales, days = 30 }: { sales: Sale[]; days?: number }
 }
 
 export function WeatherChart({ sales }: { sales: Sale[] }) {
-  const weather = ["맑음", "흐림", "비", "눈"].map((label) => {
-    const rows = sales.filter((sale) => sale.weather === label);
-    return { label, amount: rows.reduce((sum, sale) => sum + sale.amount, 0) / (rows.length || 1) };
-  });
+  const weather = summarizeWeatherSales(sales).map(({ weather, average }) => ({ label: weather, amount: average }));
   const max = Math.max(...weather.map((item) => item.amount), 1);
 
   return <div className="weather-chart">{weather.map((item) => <div className="weather-bar" key={item.label}><span>{item.label}</span><div><i style={{ width: `${item.amount / max * 100}%` }} /></div><strong>{formatCompactCurrency(item.amount)}</strong></div>)}</div>;

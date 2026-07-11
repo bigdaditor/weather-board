@@ -3,56 +3,27 @@ import { WeatherChart } from "@/app/ui/charts";
 import { DataTable } from "@/app/ui/table";
 import { getSales } from "@/lib/db";
 import { formatCompactCurrency, formatCurrency, formatDate } from "@/util/format";
+import {
+  addMonths,
+  formatMonthLabel,
+  monthFromDate,
+  selectedMonth,
+  type SearchParams,
+} from "@/util/month";
+import { summarizeWeatherSales } from "@/util/sales-summary";
 
 export const dynamic = "force-dynamic";
-
-type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
-
-function firstValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function getMonth(date: string) {
-  return date.slice(0, 7);
-}
-
-function isMonth(value: string | undefined) {
-  if (!/^\d{4}-\d{2}$/.test(value ?? "")) return false;
-  const monthNumber = Number(value?.slice(5, 7));
-  return monthNumber >= 1 && monthNumber <= 12;
-}
-
-function formatMonthLabel(month: string) {
-  const [year, monthNumber] = month.split("-");
-  return `${year}년 ${monthNumber.padStart(2, "0")}월`;
-}
-
-function addMonths(month: string, amount: number) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthHref(month: string) {
-  return `/weather?month=${month}`;
-}
 
 export default async function WeatherPage({ searchParams }: { searchParams: SearchParams }) {
   const sales = await getSales();
   const params = await searchParams;
-  const requestedMonth = firstValue(params.month);
-  const fallbackMonth = sales[0] ? getMonth(sales[0].date) : "";
-  const selectedMonth = isMonth(requestedMonth) ? requestedMonth! : fallbackMonth;
-  const nextMonth = selectedMonth ? addMonths(selectedMonth, 1) : "";
-  const previousMonth = selectedMonth ? addMonths(selectedMonth, -1) : "";
-  const filteredSales = selectedMonth
-    ? sales.filter((sale) => getMonth(sale.date) === selectedMonth)
+  const month = selectedMonth(params, sales[0] ? monthFromDate(sales[0].date) : "");
+  const nextMonth = month ? addMonths(month, 1) : "";
+  const previousMonth = month ? addMonths(month, -1) : "";
+  const filteredSales = month
+    ? sales.filter((sale) => monthFromDate(sale.date) === month)
     : [];
-  const summaries = ["맑음", "흐림", "비", "눈"].map((weather) => {
-    const rows = filteredSales.filter((sale) => sale.weather === weather);
-    const total = rows.reduce((sum, sale) => sum + sale.amount, 0);
-    return { weather, rows, total, average: total / (rows.length || 1) };
-  });
+  const summaries = summarizeWeatherSales(filteredSales);
 
   return (
     <>
@@ -69,14 +40,14 @@ export default async function WeatherPage({ searchParams }: { searchParams: Sear
           <article className="weather-summary" key={summary.weather}>
             <span>{summary.weather}</span>
             <strong>{formatCompactCurrency(summary.average)}</strong>
-            <small>평균 매출 · {summary.rows.length}일</small>
+            <small>평균 매출 · {summary.count}일</small>
           </article>
         ))}
       </section>
 
       <article className="panel chart-panel page-panel">
         <div className="panel-title">
-          <div><span className="kicker">AVERAGE SALES</span><h2>{selectedMonth ? `${formatMonthLabel(selectedMonth)} 날씨별 평균 매출` : "날씨별 평균 매출 비교"}</h2></div>
+          <div><span className="kicker">AVERAGE SALES</span><h2>{month ? `${formatMonthLabel(month)} 날씨별 평균 매출` : "날씨별 평균 매출 비교"}</h2></div>
           <span className="sync">● API 연동</span>
         </div>
         <WeatherChart sales={filteredSales} />
@@ -84,11 +55,11 @@ export default async function WeatherPage({ searchParams }: { searchParams: Sear
 
       <article className="panel sales-panel page-panel">
         <div className="panel-title">
-          <div><span className="kicker">WEATHER SALES</span><h2>{selectedMonth ? formatMonthLabel(selectedMonth) : "월별 상세 내역"}</h2></div>
+          <div><span className="kicker">WEATHER SALES</span><h2>{month ? formatMonthLabel(month) : "월별 상세 내역"}</h2></div>
           <div className="month-pager">
-            {previousMonth ? <Link href={monthHref(previousMonth)}>이전월</Link> : <span>이전월</span>}
+            {previousMonth ? <Link href={`/weather?month=${previousMonth}`}>이전월</Link> : <span>이전월</span>}
             <strong>{filteredSales.length}건</strong>
-            {nextMonth ? <Link href={monthHref(nextMonth)}>다음월</Link> : <span>다음월</span>}
+            {nextMonth ? <Link href={`/weather?month=${nextMonth}`}>다음월</Link> : <span>다음월</span>}
           </div>
         </div>
         <DataTable

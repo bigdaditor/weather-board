@@ -1,5 +1,6 @@
 import { getAllWeather, getSales } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
+import { monthFromDate } from "@/util/month";
 
 export type PeriodType = "week" | "month";
 
@@ -149,7 +150,7 @@ export async function getWeatherMonthlySalesTrend(filters: {
       if (target === "rain" && filters.summaryRain && group !== filters.summaryRain) continue;
       const key = `${target}|${group}`;
       const months = buckets.get(key) ?? new Map<string, number>();
-      const month = sale.date.slice(0, 7);
+      const month = monthFromDate(sale.date);
       months.set(month, (months.get(month) ?? 0) + sale.amount);
       buckets.set(key, months);
     }

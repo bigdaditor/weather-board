@@ -8,6 +8,7 @@ import { Modal } from "@/app/ui/modal";
 import type { CreateSaleState } from "@/app/actions";
 import type { Sale } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/util/format";
+import { addMonths, currentMonth as getCurrentMonth, formatMonthLabel, monthFromDate } from "@/util/month";
 
 type Props = {
   sales: Sale[];
@@ -17,35 +18,13 @@ type Props = {
   ) => Promise<CreateSaleState>;
 };
 
-function getCurrentMonth() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    month: "2-digit",
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  return `${year}-${month}`;
-}
-
-function formatMonthLabel(month: string) {
-  const [year, monthNumber] = month.split("-");
-  return `${year}년 ${monthNumber.padStart(2, "0")}월`;
-}
-
-function addMonths(month: string, amount: number) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 export default function DashboardScreen({ sales, createSaleAction }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [period, setPeriod] = useState("30일");
   const [createError, setCreateError] = useState("");
   const [createPending, setCreatePending] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
-  const currentMonthSales = sales.filter((sale) => sale.date.startsWith(currentMonth));
+  const currentMonthSales = sales.filter((sale) => monthFromDate(sale.date) === currentMonth);
   const currentMonthTotal = currentMonthSales.reduce((sum, sale) => sum + sale.amount, 0);
   const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
   const average = sales.length > 0 ? Math.round(total / sales.length) : 0;
