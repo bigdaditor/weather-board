@@ -83,6 +83,12 @@ header p:last-child, .eyebrow, .kicker, .sidebar-foot, .sync { display: none; }
 .text-button { border: 0; background: transparent; color: var(--blue); font-size: 16px; font-weight: 800; }
 .panel-title .text-button { text-decoration: none; }
 .page-panel { margin-bottom: 20px; }
+.month-pager { display: flex; align-items: center; border: 1px solid var(--black); font-size: 16px; font-weight: 800; white-space: nowrap; }
+.month-pager a, .month-pager span, .month-pager strong { padding: 10px 13px; }
+.month-pager a { color: var(--black); text-decoration: none; }
+.month-pager a:hover { background: var(--black); color: var(--white); }
+.month-pager span { opacity: .35; }
+.month-pager strong { border-inline: 1px solid var(--black); color: var(--blue); }
 .period-filter { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .period-filter label { display: grid; gap: 8px; font-size: 18px; font-weight: 800; }
 .period-filter select { width: 100%; border: 2px solid var(--black); background: var(--white); color: var(--black); font-size: 22px; font-weight: 800; padding: 14px 16px; min-height: 58px; }
@@ -144,6 +150,8 @@ td:last-child { text-align: right; font-weight: 800; color: var(--blue); }
   .x-labels { font-size: 13px; }
   .tabs button, .calendar-nav button { font-size: 16px; padding: 9px 13px; }
   .text-button, .record-count { font-size: 16px; }
+  .month-pager { font-size: 15px; }
+  .month-pager a, .month-pager span, .month-pager strong { padding: 9px 11px; }
   .period-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .period-filter label { font-size: 17px; }
   .period-filter select { font-size: 20px; padding: 13px 14px; min-height: 56px; }
@@ -181,5 +189,6 @@ td:last-child { text-align: right; font-weight: 800; color: var(--blue); }
   .calendar-day { min-height: 55px; padding: 4px; }
   .calendar-day strong { display: none; }
   .period-filter { grid-template-columns: 1fr; }
+  .month-pager { width: 100%; justify-content: space-between; }
   .weather-summary-grid { grid-template-columns: 1fr 1fr; }
 }
