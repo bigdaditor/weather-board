@@ -16,26 +16,35 @@ function getMonth(date: string) {
   return date.slice(0, 7);
 }
 
+function isMonth(value: string | undefined) {
+  if (!/^\d{4}-\d{2}$/.test(value ?? "")) return false;
+  const monthNumber = Number(value?.slice(5, 7));
+  return monthNumber >= 1 && monthNumber <= 12;
+}
+
 function formatMonthLabel(month: string) {
   const [year, monthNumber] = month.split("-");
   return `${year}년 ${monthNumber.padStart(2, "0")}월`;
 }
 
-function monthHref(month: string | undefined) {
-  return month ? `/weather?month=${month}` : undefined;
+function addMonths(month: string, amount: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthHref(month: string) {
+  return `/weather?month=${month}`;
 }
 
 export default async function WeatherPage({ searchParams }: { searchParams: SearchParams }) {
   const sales = await getSales();
   const params = await searchParams;
-  const months = [...new Set(sales.map((sale) => getMonth(sale.date)))].sort((a, b) => b.localeCompare(a));
   const requestedMonth = firstValue(params.month);
-  const selectedMonth = months.includes(requestedMonth ?? "") ? requestedMonth! : (months[0] ?? "");
-  const selectedMonthIndex = months.indexOf(selectedMonth);
-  const nextMonth = selectedMonthIndex > 0 ? months[selectedMonthIndex - 1] : undefined;
-  const previousMonth = selectedMonthIndex >= 0 && selectedMonthIndex < months.length - 1
-    ? months[selectedMonthIndex + 1]
-    : undefined;
+  const fallbackMonth = sales[0] ? getMonth(sales[0].date) : "";
+  const selectedMonth = isMonth(requestedMonth) ? requestedMonth! : fallbackMonth;
+  const nextMonth = selectedMonth ? addMonths(selectedMonth, 1) : "";
+  const previousMonth = selectedMonth ? addMonths(selectedMonth, -1) : "";
   const filteredSales = selectedMonth
     ? sales.filter((sale) => getMonth(sale.date) === selectedMonth)
     : [];
@@ -77,9 +86,9 @@ export default async function WeatherPage({ searchParams }: { searchParams: Sear
         <div className="panel-title">
           <div><span className="kicker">WEATHER SALES</span><h2>{selectedMonth ? formatMonthLabel(selectedMonth) : "월별 상세 내역"}</h2></div>
           <div className="month-pager">
-            {previousMonth ? <Link href={monthHref(previousMonth)!}>이전월</Link> : <span>이전월</span>}
+            {previousMonth ? <Link href={monthHref(previousMonth)}>이전월</Link> : <span>이전월</span>}
             <strong>{filteredSales.length}건</strong>
-            {nextMonth ? <Link href={monthHref(nextMonth)!}>다음월</Link> : <span>다음월</span>}
+            {nextMonth ? <Link href={monthHref(nextMonth)}>다음월</Link> : <span>다음월</span>}
           </div>
         </div>
         <DataTable
