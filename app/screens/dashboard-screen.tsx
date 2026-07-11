@@ -30,7 +30,13 @@ function getCurrentMonth() {
 
 function formatMonthLabel(month: string) {
   const [year, monthNumber] = month.split("-");
-  return `${year}년 ${Number(monthNumber)}월`;
+  return `${year}년 ${monthNumber.padStart(2, "0")}월`;
+}
+
+function addMonths(month: string, amount: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 export default function DashboardScreen({ sales, createSaleAction }: Props) {
@@ -38,7 +44,7 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
   const [period, setPeriod] = useState("30일");
   const [createError, setCreateError] = useState("");
   const [createPending, setCreatePending] = useState(false);
-  const currentMonth = getCurrentMonth();
+  const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
   const currentMonthSales = sales.filter((sale) => sale.date.startsWith(currentMonth));
   const currentMonthTotal = currentMonthSales.reduce((sum, sale) => sum + sale.amount, 0);
   const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
@@ -52,6 +58,23 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
           <div>
             <p className="eyebrow">WEATHER SALES ANALYTICS</p>
             <h1>매출 현황</h1>
+            <div className="dashboard-month" aria-label="대시보드 조회 월">
+              <button
+                aria-label="이전 월 보기"
+                onClick={() => setCurrentMonth((month) => addMonths(month, -1))}
+                type="button"
+              >
+                ‹
+              </button>
+              <strong>{formatMonthLabel(currentMonth)}</strong>
+              <button
+                aria-label="다음 월 보기"
+                onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
+                type="button"
+              >
+                ›
+              </button>
+            </div>
             <p>날씨와 매출의 관계를 한눈에 확인하세요.</p>
           </div>
           <Button onClick={() => setModalOpen(true)}>+ 매출 입력</Button>
