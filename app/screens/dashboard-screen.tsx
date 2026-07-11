@@ -17,14 +17,33 @@ type Props = {
   ) => Promise<CreateSaleState>;
 };
 
+function getCurrentMonth() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  return `${year}-${month}`;
+}
+
+function formatMonthLabel(month: string) {
+  const [year, monthNumber] = month.split("-");
+  return `${year}년 ${Number(monthNumber)}월`;
+}
+
 export default function DashboardScreen({ sales, createSaleAction }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [period, setPeriod] = useState("30일");
   const [createError, setCreateError] = useState("");
   const [createPending, setCreatePending] = useState(false);
+  const currentMonth = getCurrentMonth();
+  const currentMonthSales = sales.filter((sale) => sale.date.startsWith(currentMonth));
+  const currentMonthTotal = currentMonthSales.reduce((sum, sale) => sum + sale.amount, 0);
   const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
-  const average = Math.round(total / sales.length);
-  const best = [...sales].sort((a, b) => b.amount - a.amount)[0];
+  const average = sales.length > 0 ? Math.round(total / sales.length) : 0;
+  const best = [...currentMonthSales].sort((a, b) => b.amount - a.amount)[0];
   const periodDays = Number(period.replace("일", ""));
 
   return (
@@ -41,8 +60,8 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
         <section className="metrics" id="overview">
           <article className="metric primary">
             <span>총 매출</span>
-            <strong>{formatCurrency(total)}</strong>
-            <small>지난달 대비 ▲ 12.8%</small>
+            <strong>{formatCurrency(currentMonthTotal)}</strong>
+            <small>{formatMonthLabel(currentMonth)} · {currentMonthSales.length}건 합계</small>
           </article>
           <article className="metric">
             <span>하루 평균</span>
@@ -51,8 +70,8 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
           </article>
           <article className="metric">
             <span>가장 높은 날</span>
-            <strong>{formatCurrency(best.amount)}</strong>
-            <small>{formatDate(best.date)} · {best.weather}</small>
+            <strong>{formatCurrency(best?.amount ?? 0)}</strong>
+            <small>{best ? `${formatDate(best.date)} · ${best.weather}` : `${formatMonthLabel(currentMonth)} 내역 없음`}</small>
           </article>
           <article className="metric">
             <span>좋은 날씨</span>
