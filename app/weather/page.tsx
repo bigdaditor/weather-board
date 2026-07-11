@@ -49,7 +49,7 @@ export default async function WeatherPage({ searchParams }: { searchParams: Sear
     ? sales.filter((sale) => getMonth(sale.date) === selectedMonth)
     : [];
   const summaries = ["맑음", "흐림", "비", "눈"].map((weather) => {
-    const rows = sales.filter((sale) => sale.weather === weather);
+    const rows = filteredSales.filter((sale) => sale.weather === weather);
     const total = rows.reduce((sum, sale) => sum + sale.amount, 0);
     return { weather, rows, total, average: total / (rows.length || 1) };
   });
@@ -76,10 +76,10 @@ export default async function WeatherPage({ searchParams }: { searchParams: Sear
 
       <article className="panel chart-panel page-panel">
         <div className="panel-title">
-          <div><span className="kicker">AVERAGE SALES</span><h2>날씨별 평균 매출 비교</h2></div>
+          <div><span className="kicker">AVERAGE SALES</span><h2>{selectedMonth ? `${formatMonthLabel(selectedMonth)} 날씨별 평균 매출` : "날씨별 평균 매출 비교"}</h2></div>
           <span className="sync">● API 연동</span>
         </div>
-        <WeatherChart sales={sales} />
+        <WeatherChart sales={filteredSales} />
       </article>
 
       <article className="panel sales-panel page-panel">

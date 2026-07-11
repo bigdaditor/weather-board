@@ -93,7 +93,7 @@ export function WeatherChart({ sales }: { sales: Sale[] }) {
     const rows = sales.filter((sale) => sale.weather === label);
     return { label, amount: rows.reduce((sum, sale) => sum + sale.amount, 0) / (rows.length || 1) };
   });
-  const max = Math.max(...weather.map((item) => item.amount));
+  const max = Math.max(...weather.map((item) => item.amount), 1);
 
   return <div className="weather-chart">{weather.map((item) => <div className="weather-bar" key={item.label}><span>{item.label}</span><div><i style={{ width: `${item.amount / max * 100}%` }} /></div><strong>{formatCompactCurrency(item.amount)}</strong></div>)}</div>;
 }
