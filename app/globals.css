@@ -62,6 +62,12 @@ header p:last-child, .eyebrow, .kicker, .sidebar-foot, .sync { display: none; }
 .line-chart line { stroke: var(--black); stroke-opacity: .16; stroke-width: 1; }
 .line-chart polyline { fill: none; stroke: oklch(43% .24 258.23); stroke-width: 5; vector-effect: non-scaling-stroke; }
 .line-chart circle { fill: var(--white); stroke: oklch(43% .24 258.23); stroke-width: 4; vector-effect: non-scaling-stroke; }
+.chart-hover-layer { position: absolute; inset: 0 12px auto 76px; height: 200px; pointer-events: none; }
+.chart-hover-point { position: absolute; left: var(--point-x); top: var(--point-y); width: 28px; height: 28px; padding: 0; border: 0; background: transparent; transform: translate(-50%, -50%); pointer-events: auto; }
+.chart-hover-point:focus-visible { outline: 2px solid var(--black); outline-offset: 2px; }
+.chart-tooltip { position: absolute; left: 50%; bottom: calc(100% + 8px); display: grid; gap: 2px; min-width: 112px; padding: 8px 10px; border: 1px solid var(--black); background: var(--white); box-shadow: 3px 3px 0 var(--blue); color: var(--black); font-size: 13px; font-weight: 800; line-height: 1.2; text-align: left; white-space: nowrap; opacity: 0; transform: translateX(-50%) translateY(4px); transition: opacity .12s ease, transform .12s ease; pointer-events: none; z-index: 2; }
+.chart-tooltip strong { color: var(--blue); font-size: 14px; }
+.chart-hover-point:hover .chart-tooltip, .chart-hover-point:focus-visible .chart-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
 .y-labels { position: absolute; inset: 12px auto 64px 0; width: 66px; display: flex; flex-direction: column; justify-content: space-between; font-size: 14px; opacity: .82; font-weight: 800; text-align: right; }
 .x-labels { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; font-size: 14px; opacity: .82; font-weight: 800; white-space: nowrap; }
 .calendar { display: grid; grid-template-columns: repeat(7, 1fr); border-left: 1px solid var(--black); border-top: 1px solid var(--black); }
@@ -128,6 +134,7 @@ td:last-child { text-align: right; font-weight: 800; color: var(--blue); }
   .weather-chart, .line-chart { height: 260px; }
   .line-chart { padding: 0 12px 34px 76px; }
   .line-chart svg { height: 224px; }
+  .chart-hover-layer { height: 224px; }
   .weather-bar { grid-template-columns: 60px 1fr 88px; font-size: 16px; }
   .y-labels { inset: 12px auto 68px 0; width: 66px; font-size: 13px; }
   .x-labels { font-size: 13px; }

@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import type { Sale } from "@/lib/db";
-import { formatCompactCurrency, formatShortDate } from "@/util/format";
+import { formatCompactCurrency, formatCurrency, formatShortDate } from "@/util/format";
 
 const lineChartWidth = 600;
 const lineChartHeight = 210;
@@ -35,6 +36,16 @@ export function LineChart({ sales, days = 30 }: { sales: Sale[]; days?: number }
     const { x, y } = pointFor(sale.amount, index);
     return `${x},${y}`;
   }).join(" ");
+  const chartPoints = ordered.map((sale, index) => {
+    const { x, y } = pointFor(sale.amount, index);
+    return {
+      ...sale,
+      x,
+      y,
+      xPercent: x / lineChartWidth * 100,
+      yPercent: y / lineChartHeight * 100,
+    };
+  });
   const baseline = chartBottom + 12;
   const yTicks = [max, Math.round(max / 2), 0];
   const labelStep = Math.max(1, Math.ceil(ordered.length / 5));
@@ -51,11 +62,27 @@ export function LineChart({ sales, days = 30 }: { sales: Sale[]; days?: number }
         })}
         {points && <polygon points={`${points} ${chartRight},${baseline} ${chartLeft},${baseline}`} fill="url(#area)" />}
         <polyline points={points} />
-        {ordered.map((sale, index) => {
-          const { x, y } = pointFor(sale.amount, index);
-          return <circle key={sale.date} cx={x} cy={y} r={ordered.length > 45 ? "3" : "5"} />;
-        })}
+        {chartPoints.map((sale) => <circle key={sale.date} cx={sale.x} cy={sale.y} r={ordered.length > 45 ? "3" : "5"} />)}
       </svg>
+      <div className="chart-hover-layer" aria-hidden={ordered.length === 0}>
+        {chartPoints.map((sale) => (
+          <button
+            aria-label={`${formatShortDate(sale.date)} 매출 ${formatCurrency(sale.amount)}`}
+            className="chart-hover-point"
+            key={sale.date}
+            style={{
+              "--point-x": `${sale.xPercent}%`,
+              "--point-y": `${sale.yPercent}%`,
+            } as CSSProperties}
+            type="button"
+          >
+            <span className="chart-tooltip">
+              <b>{formatShortDate(sale.date)}</b>
+              <strong>{formatCurrency(sale.amount)}</strong>
+            </span>
+          </button>
+        ))}
+      </div>
       <div className="x-labels">{visibleLabels.map((sale) => <span key={sale.date}>{formatShortDate(sale.date)}</span>)}</div>
     </div>
   );
