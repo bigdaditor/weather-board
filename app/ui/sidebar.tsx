@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
+  { href: "/calendar", label: "캘린더" },
   { href: "/", label: "대시보드" },
   { href: "/weather", label: "날씨별 매출" },
-  { href: "/calendar", label: "캘린더" },
   { href: "/sales", label: "매출 내역" },
 ];
 
