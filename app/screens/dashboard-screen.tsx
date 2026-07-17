@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { LineChart, WeatherChart } from "@/app/ui/charts";
 import { Button } from "@/app/ui/button";
@@ -23,6 +23,7 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
   const [period, setPeriod] = useState("30일");
   const [createError, setCreateError] = useState("");
   const [createPending, setCreatePending] = useState(false);
+  const createSubmitting = useRef(false);
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
   const currentMonthSales = sales.filter((sale) => monthFromDate(sale.date) === currentMonth);
   const currentMonthTotal = currentMonthSales.reduce((sum, sale) => sum + sale.amount, 0);
@@ -105,15 +106,22 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
 
       <Modal open={modalOpen} title="매출 입력" onClose={() => setModalOpen(false)}>
         <form action={async (formData) => {
+          if (createSubmitting.current) return;
+
+          createSubmitting.current = true;
           setCreatePending(true);
           setCreateError("");
-          const result = await createSaleAction({ success: false }, formData);
-          setCreatePending(false);
+          try {
+            const result = await createSaleAction({ success: false }, formData);
 
-          if (result.success) {
-            setModalOpen(false);
-          } else {
-            setCreateError(result.error ?? "매출을 저장하지 못했습니다.");
+            if (result.success) {
+              setModalOpen(false);
+            } else {
+              setCreateError(result.error ?? "매출을 저장하지 못했습니다.");
+            }
+          } finally {
+            createSubmitting.current = false;
+            setCreatePending(false);
           }
         }} className="sale-form">
           <label>날짜<input name="date" type="date" defaultValue="2026-06-13" required /></label>
