@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/calendar", label: "캘린더" },
-  { href: "/", label: "대시보드" },
+  { href: "/dashboard", label: "대시보드" },
 ];
 
 export function Sidebar() {
