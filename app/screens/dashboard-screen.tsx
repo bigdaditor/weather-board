@@ -1,14 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
-import { LineChart, WeatherChart } from "@/app/ui/charts";
+import { useRouter } from "next/navigation";
+import { MonthlySalesChart, WeeklySalesChart, YearOverYearSalesChart } from "@/app/ui/charts";
 import { Button } from "@/app/ui/button";
+import { DataTable } from "@/app/ui/table";
 import { Modal } from "@/app/ui/modal";
 import type { CreateSaleState } from "@/app/actions";
 import type { Sale } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/util/format";
 import { addMonths, currentMonth as getCurrentMonth, formatMonthLabel, monthFromDate } from "@/util/month";
+import { paymentTypes, summarizePayments } from "@/util/sales-summary";
 
 type Props = {
   sales: Sale[];
@@ -19,18 +21,89 @@ type Props = {
 };
 
 export default function DashboardScreen({ sales, createSaleAction }: Props) {
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
-  const [period, setPeriod] = useState("30일");
+  const [createDefaults, setCreateDefaults] = useState({ date: "", amount: "", paymentType: "카드" });
   const [createError, setCreateError] = useState("");
   const [createPending, setCreatePending] = useState(false);
   const createSubmitting = useRef(false);
+  const [syncPending, setSyncPending] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
   const currentMonthSales = sales.filter((sale) => monthFromDate(sale.date) === currentMonth);
   const currentMonthTotal = currentMonthSales.reduce((sum, sale) => sum + sale.amount, 0);
-  const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
-  const average = sales.length > 0 ? Math.round(total / sales.length) : 0;
-  const best = [...currentMonthSales].sort((a, b) => b.amount - a.amount)[0];
-  const periodDays = Number(period.replace("일", ""));
+  const dailySales = new Map<string, Sale[]>();
+
+  for (const sale of currentMonthSales) {
+    dailySales.set(sale.date, [...(dailySales.get(sale.date) ?? []), sale]);
+  }
+
+  const dailyTotals = [...dailySales].map(([date, rows]) => ({
+    date,
+    amount: rows.reduce((sum, sale) => sum + sale.amount, 0),
+  }));
+  const average = dailyTotals.length > 0 ? Math.round(currentMonthTotal / dailyTotals.length) : 0;
+  const best = [...dailyTotals].sort((a, b) => b.amount - a.amount)[0];
+  const weatherTotals = new Map<string, { total: number; dates: Set<string> }>();
+
+  for (const sale of currentMonthSales) {
+    if (sale.weather === "미동기화") continue;
+    const weather = weatherTotals.get(sale.weather) ?? { total: 0, dates: new Set<string>() };
+    weather.total += sale.amount;
+    weather.dates.add(sale.date);
+    weatherTotals.set(sale.weather, weather);
+  }
+
+  const bestWeather = [...weatherTotals]
+    .map(([weather, value]) => ({ weather, average: value.total / value.dates.size }))
+    .sort((a, b) => b.average - a.average)[0];
+
+  const salesGroups = [...dailySales.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, rows]) => {
+      const payments = summarizePayments(rows);
+      return {
+        rows,
+        cells: [
+          formatDate(date),
+          rows[0].weather,
+          ...paymentTypes.map((paymentType) => payments[paymentType].amount > 0
+            ? formatCurrency(payments[paymentType].amount)
+            : "-"),
+          formatCurrency(rows.reduce((sum, sale) => sum + sale.amount, 0)),
+        ],
+      };
+    });
+  const salesRows = salesGroups.map(({ cells }) => cells);
+
+  async function synchronizeWeather() {
+    setSyncPending(true);
+    setSyncMessage("");
+    try {
+      const response = await fetch("/api/weather", { method: "POST" });
+      const body = await response.json() as { detail?: string } | unknown[];
+      if (!response.ok) {
+        if (response.status === 404) setSyncMessage("동기화할 매출이 없습니다.");
+        else setSyncMessage(!Array.isArray(body) && body.detail ? body.detail : "날씨 동기화에 실패했습니다.");
+        return;
+      }
+      setSyncMessage("날씨 동기화가 완료되었습니다.");
+      router.refresh();
+    } finally {
+      setSyncPending(false);
+    }
+  }
+
+  function openCreateModal(defaults?: Partial<typeof createDefaults>) {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    const defaultDate = today.startsWith(currentMonth) ? today : `${currentMonth}-01`;
+    setCreateDefaults({
+      date: defaults?.date ?? defaultDate,
+      amount: defaults?.amount ?? "",
+      paymentType: defaults?.paymentType ?? "카드",
+    });
+    setModalOpen(true);
+  }
 
   return (
     <>
@@ -57,7 +130,15 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
             </div>
             <p>날씨와 매출의 관계를 한눈에 확인하세요.</p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>+ 매출 입력</Button>
+          <div className="header-actions">
+            <div className="sync-action">
+              <Button className="secondary-button" disabled={syncPending} onClick={synchronizeWeather}>
+                {syncPending ? "동기화 중..." : "날씨 동기화"}
+              </Button>
+              {syncMessage && <span role="status">{syncMessage}</span>}
+            </div>
+            <Button onClick={() => openCreateModal()}>+ 매출 입력</Button>
+          </div>
         </header>
 
         <section className="metrics" id="overview">
@@ -74,38 +155,60 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
           <article className="metric">
             <span>가장 높은 날</span>
             <strong>{formatCurrency(best?.amount ?? 0)}</strong>
-            <small>{best ? `${formatDate(best.date)} · ${best.weather}` : `${formatMonthLabel(currentMonth)} 내역 없음`}</small>
+            <small>{best ? formatDate(best.date) : `${formatMonthLabel(currentMonth)} 내역 없음`}</small>
           </article>
           <article className="metric">
             <span>좋은 날씨</span>
-            <strong>맑음</strong>
-            <small>평균 매출 {formatCurrency(1284000)}</small>
+            <strong>{bestWeather?.weather ?? "-"}</strong>
+            <small>{bestWeather ? `평균 매출 ${formatCurrency(bestWeather.average)}` : "날씨 내역 없음"}</small>
           </article>
         </section>
 
-        <section className="chart-grid dashboard-chart-grid">
+        <section className="dashboard-monthly-chart">
           <article className="panel chart-panel">
             <div className="panel-title">
-              <div><span className="kicker">WEATHER IMPACT</span><h2>날씨별 매출</h2></div>
-              <Link className="text-button" href="/weather">상세보기 →</Link>
+              <div><span className="kicker">MONTHLY SALES</span><h2>{formatMonthLabel(currentMonth)} 일별 매출</h2></div>
             </div>
-            <WeatherChart sales={sales} />
-          </article>
-          <article className="panel chart-panel">
-            <div className="panel-title">
-              <div><span className="kicker">SALES TREND</span><h2>매출 추이</h2></div>
-              <div className="tabs">
-                {["7일", "30일", "90일"].map((item) => (
-                  <button className={period === item ? "selected" : ""} key={item} onClick={() => setPeriod(item)}>{item}</button>
-                ))}
-              </div>
-            </div>
-            <LineChart sales={sales} days={periodDays} />
+            <MonthlySalesChart sales={sales} month={currentMonth} />
           </article>
         </section>
+
+        <section className="chart-grid dashboard-secondary-chart-grid">
+          <article className="panel chart-panel">
+            <div className="panel-title">
+              <div><span className="kicker">WEEKLY SALES</span><h2>{formatMonthLabel(currentMonth)} 주간 매출</h2></div>
+            </div>
+            <WeeklySalesChart sales={sales} month={currentMonth} />
+          </article>
+          <article className="panel chart-panel">
+            <div className="panel-title">
+              <div><span className="kicker">YEAR OVER YEAR</span><h2>전년 동월 대비</h2></div>
+            </div>
+            <YearOverYearSalesChart sales={sales} month={currentMonth} />
+          </article>
+        </section>
+
+        <article className="panel sales-panel page-panel">
+          <div className="panel-title">
+            <div><span className="kicker">SALES HISTORY</span><h2>{formatMonthLabel(currentMonth)} 매출 내역</h2></div>
+            <span className="record-count">{salesRows.length}줄</span>
+          </div>
+          <DataTable
+            columns={["날짜", "날씨", ...paymentTypes, "합계"]}
+            rows={salesRows}
+            onRowClick={(index) => {
+              const sale = salesGroups[index].rows[0];
+              openCreateModal({
+                date: sale.date,
+                amount: String(sale.amount),
+                paymentType: sale.paymentType,
+              });
+            }}
+          />
+        </article>
 
       <Modal open={modalOpen} title="매출 입력" onClose={() => setModalOpen(false)}>
-        <form action={async (formData) => {
+        <form key={`${createDefaults.date}-${createDefaults.paymentType}-${createDefaults.amount}`} action={async (formData) => {
           if (createSubmitting.current) return;
 
           createSubmitting.current = true;
@@ -124,9 +227,45 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
             setCreatePending(false);
           }
         }} className="sale-form">
-          <label>날짜<input name="date" type="date" defaultValue="2026-06-13" required /></label>
-          <label>매출 금액<input name="amount" type="number" min="1" placeholder="0" required /></label>
-          <label>결제 수단<select name="paymentType"><option>카드</option><option>현금</option><option>지역상품권</option></select></label>
+          <label>날짜
+            <input
+              name="date"
+              type="date"
+              defaultValue={createDefaults.date}
+              onChange={(event) => {
+                const date = event.target.value;
+                const existingSale = sales.find((sale) =>
+                  sale.date === date && sale.paymentType === createDefaults.paymentType,
+                );
+                setCreateDefaults((defaults) => ({
+                  ...defaults,
+                  date,
+                  amount: existingSale ? String(existingSale.amount) : "",
+                }));
+              }}
+              required
+            />
+          </label>
+          <label>매출 금액<input name="amount" type="number" min="1" placeholder="0" defaultValue={createDefaults.amount} required /></label>
+          <label>결제 수단
+            <select
+              name="paymentType"
+              defaultValue={createDefaults.paymentType}
+              onChange={(event) => {
+                const paymentType = event.target.value;
+                const existingSale = sales.find((sale) =>
+                  sale.date === createDefaults.date && sale.paymentType === paymentType,
+                );
+                setCreateDefaults((defaults) => ({
+                  ...defaults,
+                  amount: existingSale ? String(existingSale.amount) : "",
+                  paymentType,
+                }));
+              }}
+            >
+              <option>카드</option><option>현금</option><option>지역상품권</option><option>기타</option>
+            </select>
+          </label>
           <p>저장 시 해당 날짜의 서울 날씨를 API에서 자동으로 가져옵니다.</p>
           {createError && <p className="form-error" role="alert">{createError}</p>}
           <Button type="submit" disabled={createPending}>{createPending ? "저장 중..." : "매출 저장"}</Button>
