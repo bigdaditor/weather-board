@@ -3,7 +3,7 @@ import { Sidebar } from "@/app/ui/sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Weather Sales",
+  title: "웨더보드",
   description: "날씨와 매출 관계 분석 대시보드",
 };
 
