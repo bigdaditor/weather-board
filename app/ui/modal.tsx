@@ -5,8 +5,8 @@ export function Modal({ open, title, children, onClose }: { open: boolean; title
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <section className="modal" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="modal-title"><h2>{title}</h2><button onClick={onClose}>×</button></div>
+      <section aria-modal="true" className="modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+        <div className="modal-title"><div><span>NEW RECORD</span><h2>{title}</h2></div><button aria-label="닫기" onClick={onClose}>×</button></div>
         {children}
       </section>
     </div>
