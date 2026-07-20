@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { createSale } from "@/app/actions";
+import { CalendarGrid } from "@/app/calendar/calendar-grid";
+import { CalendarSaleButton } from "@/app/calendar/calendar-sale-button";
 import { getSales } from "@/lib/db";
-import { formatCurrency } from "@/util/format";
 import {
   addMonths,
   currentMonth,
@@ -12,14 +14,6 @@ import {
 } from "@/util/month";
 
 export const dynamic = "force-dynamic";
-
-const weatherIcon: Record<string, string> = {
-  맑음: "맑",
-  흐림: "흐",
-  비: "비",
-  강우: "비",
-  눈: "눈",
-};
 
 export default async function CalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const allSales = await getSales();
@@ -41,11 +35,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
 
   const calendar = Array.from({ length: totalCells }, (_, index) => {
     const day = index - startOffset + 1;
-    if (day < 1 || day > daysInMonth) return { day: null, rows: [] };
+    if (day < 1 || day > daysInMonth) return { date: null, day: null, rows: [] };
 
     const date = `${month}-${String(day).padStart(2, "0")}`;
-    return { day, rows: salesByDate.get(date) ?? [] };
+    return { date, day, rows: salesByDate.get(date) ?? [] };
   });
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const defaultDate = today.startsWith(month) ? today : `${month}-01`;
 
   return (
     <>
@@ -55,6 +51,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
           <h1>매출 캘린더</h1>
           <p>날짜별 날씨와 매출을 월간 캘린더에서 확인하세요.</p>
         </div>
+        <CalendarSaleButton createSaleAction={createSale} defaultDate={defaultDate} />
       </header>
 
       <article className="panel calendar-panel page-panel">
@@ -66,22 +63,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
             <Link href={`/calendar?month=${addMonths(month, 1)}`}>다음월</Link>
           </div>
         </div>
-        <div className="calendar week">
-          {["일", "월", "화", "수", "목", "금", "토"].map((day) => <span key={day}>{day}</span>)}
-        </div>
-        <div className="calendar calendar-large">
-          {calendar.map(({ day, rows }, index) => (
-            <div className={rows.length ? "calendar-day has-sale" : "calendar-day"} key={index}>
-              {day && <b>{day}</b>}
-              {rows.map((sale) => (
-                <div className="calendar-entry" key={sale.id}>
-                  <span>{weatherIcon[sale.weather] ?? sale.weather} {sale.temperature}°</span>
-                  <strong>{formatCurrency(sale.amount)}</strong>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        <CalendarGrid calendar={calendar} />
       </article>
     </>
   );
