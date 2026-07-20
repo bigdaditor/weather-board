@@ -1,7 +1,8 @@
 import type { Sale } from "@/lib/db";
+import { normalizePaymentType } from "@/util/payment";
 
-export const paymentTypes = ["카드", "현금", "지역상품권"];
-export const weatherTypes = ["맑음", "흐림", "비", "눈"];
+export const paymentTypes = ["카드", "현금", "지역상품권", "기타"];
+export const weatherTypes = ["맑음", "흐림", "비", "눈", "기타"];
 
 export function summarizePayments(sales: Sale[]) {
   const summary = Object.fromEntries(paymentTypes.map((paymentType) => [
@@ -10,7 +11,7 @@ export function summarizePayments(sales: Sale[]) {
   ])) as Record<string, { amount: number; count: number }>;
 
   for (const sale of sales) {
-    const payment = summary[sale.paymentType];
+    const payment = summary[normalizePaymentType(sale.paymentType)];
     if (!payment) continue;
     payment.amount += sale.amount;
     payment.count += 1;

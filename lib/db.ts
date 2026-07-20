@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
+import { normalizePaymentType } from "@/util/payment";
 
 export type Sale = {
   id: number;
@@ -51,7 +52,7 @@ function toWeather(row: WeatherRow): Weather {
     sumRain: Number(row.sum_rain),
     avgHumidity: Number(row.avg_humidity),
     oneHourRain: Number(row.one_hour_rain),
-    summary: row.summary,
+    summary: row.summary.trim().toLowerCase() === "etc" ? "기타" : row.summary,
   };
 }
 
@@ -60,7 +61,7 @@ function toSale(row: SaleRow, weather?: Weather): Sale {
     id: Number(row.id),
     date: row.input_date,
     amount: Number(row.amount),
-    paymentType: row.payment_type,
+    paymentType: normalizePaymentType(row.payment_type),
     weather: weather?.summary ?? "미동기화",
     temperature: Math.round(weather?.maxTemp ?? 0),
     createdAt: row.created_at,
@@ -114,16 +115,16 @@ export async function getSaleById(id: number): Promise<Sale | undefined> {
   return toSale(saleRow as SaleRow, weatherRow ? toWeather(weatherRow as WeatherRow) : undefined);
 }
 
-export async function insertSale(sale: Omit<Sale, "id" | "weather" | "temperature">): Promise<Sale> {
+export async function upsertSale(sale: Omit<Sale, "id" | "weather" | "temperature">): Promise<Sale> {
   const { data, error } = await getSupabase()
     .from("sale")
-    .insert({
+    .upsert({
       input_date: sale.date,
       amount: sale.amount,
       payment_type: sale.paymentType,
       created_at: sale.createdAt,
       sync_status: sale.syncStatus,
-    })
+    }, { onConflict: "input_date,payment_type" })
     .select("id")
     .single();
 

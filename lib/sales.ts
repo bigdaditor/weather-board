@@ -2,12 +2,13 @@ import {
   deleteSaleByDateAndPaymentType,
   getSaleById,
   getSales,
-  insertSale,
+  upsertSale,
   updateSaleByDateAndPaymentType,
   type Sale,
 } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
 import { isMonth, monthFromDate } from "@/util/month";
+import { normalizePaymentType } from "@/util/payment";
 
 export type SaleApiRecord = {
   id: number;
@@ -33,7 +34,7 @@ function requireAmount(value: unknown) {
 }
 
 function requirePaymentType(value: unknown) {
-  const paymentType = String(value ?? "").trim();
+  const paymentType = normalizePaymentType(String(value ?? ""));
   if (!paymentType) throw new ApiError(422, "payment_type is required");
   return paymentType;
 }
@@ -56,7 +57,7 @@ export async function createSaleRecord(data: Record<string, unknown>) {
   const createdAt = typeof data.created_at === "string" ? data.created_at : new Date().toISOString();
   const syncStatus = Number.isInteger(data.sync_status) ? Number(data.sync_status) : 0;
 
-  return insertSale({
+  return upsertSale({
     date,
     amount,
     paymentType,
