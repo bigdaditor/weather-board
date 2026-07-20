@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MonthlySalesChart, WeeklySalesChart, YearOverYearSalesChart } from "@/app/ui/charts";
+import { AnnualSalesChart, MonthlySalesChart, WeeklySalesChart, YearOverYearSalesChart } from "@/app/ui/charts";
 import { Button } from "@/app/ui/button";
 import { DataTable } from "@/app/ui/table";
 import { Modal } from "@/app/ui/modal";
@@ -42,7 +42,9 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
     date,
     amount: rows.reduce((sum, sale) => sum + sale.amount, 0),
   }));
-  const average = dailyTotals.length > 0 ? Math.round(currentMonthTotal / dailyTotals.length) : 0;
+  const recordedDayCount = dailyTotals.length;
+  const average = recordedDayCount > 0 ? Math.round(currentMonthTotal / recordedDayCount) : 0;
+  const annualStartMonth = addMonths(currentMonth, -12);
   const best = [...dailyTotals].sort((a, b) => b.amount - a.amount)[0];
   const weatherTotals = new Map<string, { total: number; dates: Set<string> }>();
 
@@ -117,7 +119,7 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
                 onClick={() => setCurrentMonth((month) => addMonths(month, -1))}
                 type="button"
               >
-                ‹
+                <span aria-hidden="true">←</span>
               </button>
               <strong>{formatMonthLabel(currentMonth)}</strong>
               <button
@@ -125,7 +127,7 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
                 onClick={() => setCurrentMonth((month) => addMonths(month, 1))}
                 type="button"
               >
-                ›
+                <span aria-hidden="true">→</span>
               </button>
             </div>
             <p>날씨와 매출의 관계를 한눈에 확인하세요.</p>
@@ -150,7 +152,7 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
           <article className="metric">
             <span>하루 평균</span>
             <strong>{formatCurrency(average)}</strong>
-            <small>최근 {sales.length}일 기준</small>
+            <small>{formatMonthLabel(currentMonth)} · 입력된 {recordedDayCount}일 기준</small>
           </article>
           <article className="metric">
             <span>가장 높은 날</span>
@@ -161,6 +163,15 @@ export default function DashboardScreen({ sales, createSaleAction }: Props) {
             <span>좋은 날씨</span>
             <strong>{bestWeather?.weather ?? "-"}</strong>
             <small>{bestWeather ? `평균 매출 ${formatCurrency(bestWeather.average)}` : "날씨 내역 없음"}</small>
+          </article>
+        </section>
+
+        <section className="dashboard-monthly-chart">
+          <article className="panel chart-panel">
+            <div className="panel-title">
+              <div><span className="kicker">ANNUAL SALES</span><h2>{formatMonthLabel(annualStartMonth)}부터 월별 매출</h2></div>
+            </div>
+            <AnnualSalesChart sales={sales} month={currentMonth} />
           </article>
         </section>
 

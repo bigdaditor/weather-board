@@ -13,11 +13,13 @@ import {
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 import type { Sale } from "@/lib/db";
+import { addMonths } from "@/util/month";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
-const blue = "oklch(57.61% .2508 258.23)";
-const black = "#080808";
+const accent = "#0e766e";
+const ink = "#52636a";
+const grid = "rgba(113, 128, 134, .14)";
 
 function previousYearMonth(month: string) {
   return `${Number(month.slice(0, 4)) - 1}${month.slice(4)}`;
@@ -45,14 +47,25 @@ const commonOptions: ChartOptions<"line"> = {
   interaction: { intersect: false, mode: "index" },
   plugins: {
     legend: { display: false },
-    tooltip: { callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) } },
+    tooltip: {
+      backgroundColor: "#19343c",
+      titleColor: "#ffffff",
+      bodyColor: "#ffffff",
+      padding: 14,
+      titleFont: { size: 15, weight: 700 },
+      bodyFont: { size: 15, weight: 700 },
+      cornerRadius: 10,
+      displayColors: false,
+      callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) },
+    },
   },
   scales: {
-    x: { grid: { display: false }, ticks: { color: black, font: { weight: 700 } } },
+    x: { border: { display: false }, grid: { display: false }, ticks: { color: ink, font: { size: 14, weight: 600 }, maxRotation: 0, autoSkipPadding: 16 } },
     y: {
       beginAtZero: true,
-      grid: { color: "rgba(8, 8, 8, .12)" },
-      ticks: { color: black, callback: (value) => formatWon(Number(value)) },
+      border: { display: false },
+      grid: { color: grid },
+      ticks: { color: ink, font: { size: 14, weight: 600 }, padding: 8, callback: (value) => formatWon(Number(value)) },
     },
   },
 };
@@ -68,14 +81,47 @@ export function MonthlySalesChart({ sales, month }: { sales: Sale[]; month: stri
           datasets: [{
             label: month,
             data: amounts,
-            borderColor: blue,
-            backgroundColor: blue,
+            borderColor: accent,
+            backgroundColor: accent,
             pointBackgroundColor: "white",
-            pointBorderColor: blue,
-            pointRadius: 3,
+            pointBorderColor: accent,
+            pointRadius: 2,
             pointHoverRadius: 6,
+            borderWidth: 2.5,
+            tension: 0.35,
+          }],
+        }}
+        options={commonOptions}
+      />
+    </div>
+  );
+}
+
+export function AnnualSalesChart({ sales, month }: { sales: Sale[]; month: string }) {
+  const months = Array.from({ length: 13 }, (_, index) => addMonths(month, index - 12));
+  const totals = months.map((targetMonth) => sales
+    .filter((sale) => sale.date.startsWith(targetMonth))
+    .reduce((sum, sale) => sum + sale.amount, 0));
+
+  return (
+    <div className="chartjs-wrap annual-chart">
+      <Line
+        data={{
+          labels: months.map((targetMonth) => {
+            const [year, monthNumber] = targetMonth.split("-");
+            return `${year.slice(2)}.${monthNumber}`;
+          }),
+          datasets: [{
+            label: "월 매출",
+            data: totals,
+            borderColor: accent,
+            backgroundColor: accent,
+            pointBackgroundColor: "white",
+            pointBorderColor: accent,
+            pointRadius: 4,
+            pointHoverRadius: 7,
             borderWidth: 3,
-            tension: 0.25,
+            tension: 0.32,
           }],
         }}
         options={commonOptions}
@@ -93,14 +139,15 @@ export function YearOverYearSalesChart({ sales, month }: { sales: Sale[]; month:
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) } },
+      tooltip: { backgroundColor: "#19343c", padding: 14, titleFont: { size: 15, weight: 700 }, bodyFont: { size: 15, weight: 700 }, cornerRadius: 10, displayColors: false, callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: black, font: { size: 14, weight: 700 } } },
+      x: { border: { display: false }, grid: { display: false }, ticks: { color: ink, font: { size: 15, weight: 700 }, padding: 8 } },
       y: {
         beginAtZero: true,
-        grid: { color: "rgba(8, 8, 8, .12)" },
-        ticks: { color: black, callback: (value) => formatWon(Number(value)) },
+        border: { display: false },
+        grid: { color: grid },
+        ticks: { color: ink, font: { size: 14, weight: 600 }, padding: 8, callback: (value) => formatWon(Number(value)) },
       },
     },
   };
@@ -113,9 +160,10 @@ export function YearOverYearSalesChart({ sales, month }: { sales: Sale[]; month:
           datasets: [{
             label: "월 매출",
             data: [previousTotal, currentTotal],
-            backgroundColor: ["rgba(8, 8, 8, .65)", blue],
-            borderColor: [black, blue],
-            borderWidth: 1,
+            backgroundColor: ["#cbd7d5", accent],
+            borderColor: ["#cbd7d5", accent],
+            borderRadius: 8,
+            borderWidth: 0,
             maxBarThickness: 100,
           }],
         }}
@@ -140,14 +188,15 @@ export function WeeklySalesChart({ sales, month }: { sales: Sale[]; month: strin
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) } },
+      tooltip: { backgroundColor: "#19343c", padding: 14, titleFont: { size: 15, weight: 700 }, bodyFont: { size: 15, weight: 700 }, cornerRadius: 10, displayColors: false, callbacks: { label: (context) => formatWon(context.parsed.y ?? 0) } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: black, font: { size: 14, weight: 700 } } },
+      x: { border: { display: false }, grid: { display: false }, ticks: { color: ink, font: { size: 15, weight: 700 }, padding: 8 } },
       y: {
         beginAtZero: true,
-        grid: { color: "rgba(8, 8, 8, .12)" },
-        ticks: { color: black, callback: (value) => formatWon(Number(value)) },
+        border: { display: false },
+        grid: { color: grid },
+        ticks: { color: ink, font: { size: 14, weight: 600 }, padding: 8, callback: (value) => formatWon(Number(value)) },
       },
     },
   };
@@ -160,9 +209,10 @@ export function WeeklySalesChart({ sales, month }: { sales: Sale[]; month: strin
           datasets: [{
             label: "주간 매출",
             data: weekly.map(({ amount }) => amount),
-            backgroundColor: blue,
-            borderColor: blue,
-            borderWidth: 1,
+            backgroundColor: accent,
+            borderColor: accent,
+            borderRadius: 8,
+            borderWidth: 0,
             maxBarThickness: 120,
           }],
         }}
