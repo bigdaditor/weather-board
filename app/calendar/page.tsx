@@ -22,7 +22,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
   const month = selectedMonth(params, fallbackMonth);
   const sales = allSales.filter((sale) => monthFromDate(sale.date) === month);
   const firstDay = new Date(`${month}-01T00:00:00Z`);
-  const startOffset = firstDay.getUTCDay();
+  // Convert Sunday-first getUTCDay() to a Monday-first calendar index.
+  const startOffset = (firstDay.getUTCDay() + 6) % 7;
   const daysInMonth = new Date(Date.UTC(firstDay.getUTCFullYear(), firstDay.getUTCMonth() + 1, 0)).getUTCDate();
   const totalCells = Math.max(35, Math.ceil((startOffset + daysInMonth) / 7) * 7);
   const salesByDate = new Map<string, typeof sales>();
@@ -63,7 +64,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
             <Link href={`/calendar?month=${addMonths(month, 1)}`}>다음월</Link>
           </div>
         </div>
-        <CalendarGrid calendar={calendar} />
+        <CalendarGrid calendar={calendar} createSaleAction={createSale} />
       </article>
     </>
   );

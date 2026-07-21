@@ -66,6 +66,12 @@ export async function createSaleRecord(data: Record<string, unknown>) {
   });
 }
 
+export async function clearSaleRecord(data: Record<string, unknown>) {
+  const date = requireDate(data.input_date);
+  const paymentType = requirePaymentType(data.payment_type);
+  return deleteSaleByDateAndPaymentType(date, paymentType);
+}
+
 export async function getSaleRecord(id: number) {
   if (!Number.isInteger(id) || id < 1) throw new ApiError(422, "sale_id must be a positive integer");
   const sale = await getSaleById(id);

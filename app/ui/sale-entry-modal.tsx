@@ -43,9 +43,9 @@ export function SaleEntryModal({ createSaleAction, date, open, onClose }: Props)
         className="sale-form"
       >
         <label>날짜<input name="date" type="date" defaultValue={date} key={date} required /></label>
-        <label>매출 금액<input name="amount" type="number" min="1" placeholder="0" required /></label>
+        <label>매출 금액<input name="amount" type="number" min="0" placeholder="0" required /></label>
         <label>결제 수단<select name="paymentType"><option>카드</option><option>현금</option><option>지역상품권</option><option>기타</option></select></label>
-        <p>저장 시 해당 날짜의 서울 날씨를 API에서 자동으로 가져옵니다.</p>
+        <p>동일한 날짜와 결제 수단은 입력한 금액으로 갱신되며, 0원을 입력하면 해당 데이터가 초기화됩니다.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <Button type="submit" disabled={pending}>{pending ? "저장 중..." : "매출 저장"}</Button>
       </form>
